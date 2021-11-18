@@ -1,6 +1,5 @@
 #include <iostream>
 #include <Eigen/Dense>
-// #include <cmath>
  
 using namespace Eigen;
 using namespace std;
@@ -24,6 +23,14 @@ using namespace std;
 
 // max measurement range: 6
 // max movement : 5
+
+// Ax = b
+// b: measurements 
+// A: combined jacobians
+// x: trajectory + landmarks
+
+// ***** Code assumes you know what landmark each measurement is associated with
+
 
 int main()
 {
@@ -59,7 +66,7 @@ int main()
             int temp = sqrt(pow(x_distantce, 2) + pow(y_distantce,2));
             if(temp <= 6)
             {
-                temp_b(num_poses+z_itt) = temp; // DO WE ALSO NEED A ANGLE OF OBSERVATION?
+                temp_b(num_poses+z_itt) = temp; // update 3 pose measurements as well as 2 lm measurements
                 landmark_reference(z_itt) = j;
                 pose_reference(z_itt) = i;
                 z_itt++;
@@ -98,13 +105,13 @@ int main()
     //     }
     // }
     
-    // // cout << "A" << endl << A << endl;
+    // // Squareroot SAM
     // MatrixXf I = A.transpose()*A;
 
     // MatrixXf L( I.llt().matrixL() );
     // MatrixXf L_T=L.adjoint();//conjugate transpose
 
-    // // // solves least squares using above L*LT*x = b from cholesky
+    // // // solves least squares using above L*LT*x = AT*b from cholesky
     // VectorXf y = L.colPivHouseholderQr().solve(A.transpose()*b);
     // VectorXf x = L_T.colPivHouseholderQr().solve(y);
 

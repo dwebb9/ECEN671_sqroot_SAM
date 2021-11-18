@@ -1,13 +1,8 @@
 #include <iostream>
 #include <Eigen/Dense>
-// #include <cmath>
  
 using namespace Eigen;
 using namespace std;
-
-// strat for adding large A, R, and I. generate I and R inside a while loop and only save 
-// the output. When saving input in b and generating A. Simply save in a very large matrix
-// and keep track of the number of rows and columns being used. 
 
 // linear example
 // |----L-L----L-----L---L---
@@ -15,6 +10,13 @@ using namespace std;
 
 // max measurement range: 6
 // max movement : 5
+
+// Ax = b
+// b: measurements 
+// A: combined jacobians
+// x: trajectory + landmarks
+
+// ***** Code assumes you know what landmark each measurement is associated with
 
 int main()
 {
@@ -89,7 +91,7 @@ int main()
         }
     }
     
-    // cout << "A" << endl << A << endl;
+    // Squareroot SAM
     MatrixXf I = A.transpose()*A;
 
     MatrixXf L( I.llt().matrixL() );
