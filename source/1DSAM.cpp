@@ -46,13 +46,13 @@ int main()
 
     for(int i = 1; i < num_poses; i++)
     {
-        temp_b(i) = pose_groundtruth[i] - pose_groundtruth[i-1];
+        temp_b(i) = pose_groundtruth[i] - pose_groundtruth[i-1]; // odometry 
         for(int j = 0; j < num_landmarks; j++)
         {
             int temp = abs(landmark_groundtruth[j] - pose_groundtruth[i]);
             if(temp <= 6)
             {
-                temp_b(num_poses+z_itt) = landmark_groundtruth[j] - pose_groundtruth[i];
+                temp_b(num_poses+z_itt) = landmark_groundtruth[j] - pose_groundtruth[i]; // range
                 landmark_reference(z_itt) = j;
                 pose_reference(z_itt) = i;
                 z_itt++;
@@ -94,7 +94,7 @@ int main()
     // Squareroot SAM
     MatrixXf I = A.transpose()*A;
 
-    MatrixXf L( I.llt().matrixL() );
+    MatrixXf L( I.llt().matrixL() ); //L'L = A'A
     MatrixXf L_T=L.adjoint();//conjugate transpose
 
     // // solves least squares using above L*LT*x = b from cholesky
