@@ -38,6 +38,7 @@ int main()
     // randomly initialized as the value will change later
     VectorXf b(max_b_size);
 
+    // b = [0, u1, u2 ... um, z1, z2 ... zn]
     // temp vector that stores b values
     VectorXf temp_b(max_b_size);
     VectorXf landmark_reference(max_b_size);
@@ -69,6 +70,22 @@ int main()
 
     
     // next step is to generate A matrix
+    // Equations that make up A.
+    // h(theta) = [ xt - xt-1] (corresponds to u)
+    //            [ L -  xt]   (corresponds to z)
+
+                
+    // Jmotion = [-1 1]
+    // Jmeasure = [-1 1]
+
+    // A =     x0  x1 x2 ...  l1 l2 ....
+    //       0 [1  0   0  ...  0 0 ....]
+    //       u1[-1 1   0  ...  0 0 ....]
+    //       u2[0  -1  1  ...  0 0 ....]
+    //       z1[0  -1  0  ...  1 0 ....]
+    //       z2[0   0  -1 ...  1 0 ....]
+    //       z3[0   0  -1 ...  0 1 ....]
+
     MatrixXf A(num_poses + z_itt, num_poses + num_landmarks);
     A(0,0) = 1;
     int pose_itt = 1;
@@ -91,10 +108,12 @@ int main()
         }
     }
     
+    cout << "A: " << endl << A << endl;
+
     // Squareroot SAM
     MatrixXf I = A.transpose()*A;
 
-    MatrixXf L( I.llt().matrixL() ); //L'L = A'A
+    MatrixXf L( I.llt().matrixL() ); //LL' = A'A
     MatrixXf L_T=L.adjoint();//conjugate transpose
 
     // // solves least squares using above L*LT*x = b from cholesky

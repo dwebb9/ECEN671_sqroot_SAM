@@ -101,29 +101,88 @@ int main()
     // cout << "b:" << endl << b << endl;
     // cout << "last OD: " << endl << b(num_poses*3 - 3) << endl << b(num_poses*3 - 2) << endl << b(num_poses*3 - 1) << endl;
 
+    VectorXf thetaPred(25); 
+    thetaPred(0) = 0;
+    b_itt = 3;
+    for(int i = 1; i < 25; i++)
+    {
+        thetaPred(i) = thetaPred(i - 1) + b(b_itt) + b(b_itt + 2);
+        b_itt = b_itt + 3;
+    }
+
+    b_itt = 3; // reset b itterator to use in A matrix generation
+
     // next step is to generate A matrix
-    MatrixXf A(num_poses + z_itt, num_poses + num_landmarks); // NEEDS UPDATED!
-    A(0,0) = 1;// NEEDS UPDATED!
-    int pose_itt = 1;// NEEDS UPDATED!
+    MatrixXf A(num_poses*3 + z_itt*2, num_poses*3 + num_landmarks*2);
+    A(0,0) = 1;
+    A(1,1) = 1;
+    A(2,2) = 1;
+    int pose_itt = 0;
+    int theta_itt = 0;
+    int theta_itt_2 = 0;
     int measure_itt = 0;// NEEDS UPDATED!
-    // for (int i = 1; i < num_poses + z_itt; i++)
-    // {
-    //     if(i < num_poses)
-    //     {
-    //         A(i,pose_itt - 1) = -1;
-    //         A(i,pose_itt) = 1;
-    //         pose_itt++;
-    //     }
-    //     else
-    //     {
-    //         int p = pose_reference(measure_itt);
-    //         int lm = landmark_reference(measure_itt) + num_poses;
-    //         A(i,lm) = 1;
-    //         A(i,p) = -1;
-    //         measure_itt++;
-    //     }
-    // }
+    for (int i = 1; i < num_poses + z_itt; i++)
+    {
+        
+        if(i < num_poses)
+        {
+            // J motion
+            Vector2f Sigma; 
+            Sigma(0) = b(b_itt + 1)*cos(thetaPred(theta_itt) + b(b_itt)); // sigma x
+            Sigma(1) = b(b_itt + 1)*sin(thetaPred(theta_itt) + b(b_itt)); // sigma y
+            int q = Sigma.transpose()*Sigma;
+            A(pose_itt + 3, pose_itt) = Sigma(1)/q;
+            A(pose_itt + 3, pose_itt + 1) = -Sigma(0)/q;
+            A(pose_itt + 3, pose_itt + 2) = -1;
+            A(pose_itt + 3, pose_itt + 3) = -Sigma(1)/q;
+            A(pose_itt + 3, pose_itt + 4) = Sigma(0)/q;
+
+            A(pose_itt + 4, pose_itt) = -sqrt(q)*Sigma(0)/q;
+            A(pose_itt + 4, pose_itt + 1) = -sqrt(q)*Sigma(1)/q;
+            A(pose_itt + 4, pose_itt + 3) = sqrt(q)*Sigma(0)/q;
+            A(pose_itt + 4, pose_itt + 4) = sqrt(q)*Sigma(1)/q;
+
+            A(pose_itt + 5, pose_itt) = -Sigma(1)/q;
+            A(pose_itt + 5, pose_itt + 1) = Sigma(0)/q;
+            A(pose_itt + 5, pose_itt + 3) = Sigma(1)/q;
+            A(pose_itt + 5, pose_itt + 4) = -Sigma(0)/q;
+            A(pose_itt + 5, pose_itt + 5) = 1;
+
+            pose_itt = pose_itt + 3;
+            theta_itt++;
+            b_itt = b_itt + 3;
+        }
+        else
+        {
+            // J observation 
+            int p = 3*pose_reference(measure_itt); // needs updated
+            int lm = 2*landmark_reference(measure_itt) + num_poses*3; // needs updated
+            int meas_row = num_poses*3 + 2*measure_itt + 3;
+            
+            Vector2f Sigma; 
+            Sigma(0) = b(meas_row)*cos(thetaPred(p) + b(meas_row + 1)); // sigma x
+            Sigma(1) = b(meas_row)*sin(thetaPred(p) + b(meas_row + 1)); // sigma y
+            int q = Sigma.transpose()*Sigma;
+
+            // z
+            A(meas_row, p) = -sqrt(q)*Sigma(0)/q; // xt
+            A(meas_row, p + 1) = -sqrt(q)*Sigma(1)/q; // yx
+            A(meas_row, lm) = sqrt(q)*Sigma(0)/q; // Lx
+            A(meas_row, lm + 1) = sqrt(q)*Sigma(1)/q; // Ly
+
+            // row
+            A(meas_row + 1, p) = Sigma(1)/q; // xt
+            A(meas_row + 1, p + 1) = -Sigma(0)/q; // yt
+            A(meas_row + 1, p + 2) = -1; // Lx
+            A(meas_row + 1, lm) = -Sigma(1)/q; // Ly
+            A(meas_row + 1, lm + 1) = Sigma(0)/q;
+
+            measure_itt++;
+        }
+    }
     
+    cout << "A: " << endl << A << endl; 
+    // cout << "theta_itt: " << endl << theta_itt << endl;
     // // Squareroot SAM
     // MatrixXf I = A.transpose()*A;
 
