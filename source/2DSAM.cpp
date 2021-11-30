@@ -158,7 +158,11 @@ int main()
             int p = 3*pose_reference(measure_itt); // needs updated
             int lm = 2*landmark_reference(measure_itt) + num_poses*3; // needs updated
             int meas_row = num_poses*3 + 2*measure_itt + 3;
-            
+
+            cout << "p: " << p << endl;
+            cout << "lm: " << lm << endl;
+            cout << "meas_row: " << lm << endl;
+
             Vector2f Sigma; 
             Sigma(0) = b(meas_row)*cos(thetaPred(p) + b(meas_row + 1)); // sigma x
             Sigma(1) = b(meas_row)*sin(thetaPred(p) + b(meas_row + 1)); // sigma y
