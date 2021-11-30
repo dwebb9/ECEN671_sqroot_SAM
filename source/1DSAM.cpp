@@ -1,5 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
+#include <random>
  
 using namespace Eigen;
 using namespace std;
@@ -34,9 +35,12 @@ int main()
     VectorXf gt(num_poses + num_landmarks);
     gt << 0,2,6,8,5, 9,12,11,9,13, 18,20,21,20,24, 21,17,18,14,10, 6,2,1,4,5, 5,7,12,18,22;
 
-
     // randomly initialized as the value will change later
     VectorXf b(max_b_size);
+
+    // set up random norman number generation
+    default_random_engine generator;
+    normal_distribution<double> noise(0.0, 1.0);
 
     // b = [0, u1, u2 ... um, z1, z2 ... zn]
     // temp vector that stores b values
@@ -47,13 +51,13 @@ int main()
 
     for(int i = 1; i < num_poses; i++)
     {
-        temp_b(i) = pose_groundtruth[i] - pose_groundtruth[i-1]; // odometry 
+        temp_b(i) = pose_groundtruth[i] - pose_groundtruth[i-1] + noise(generator); // odometry 
         for(int j = 0; j < num_landmarks; j++)
         {
             int temp = abs(landmark_groundtruth[j] - pose_groundtruth[i]);
             if(temp <= 6)
             {
-                temp_b(num_poses+z_itt) = landmark_groundtruth[j] - pose_groundtruth[i]; // range
+                temp_b(num_poses+z_itt) = landmark_groundtruth[j] - pose_groundtruth[i] + + noise(generator); // range
                 landmark_reference(z_itt) = j;
                 pose_reference(z_itt) = i;
                 z_itt++;
@@ -68,6 +72,11 @@ int main()
         b(i) = temp_b(i);
     }
 
+    VectorXf x_pred(num_poses);
+    for(int i = 1; i < num_poses; i++)
+    {
+        x_pred(i) = x_pred(i-1) + b(i); 
+    }
     
     // next step is to generate A matrix
     // Equations that make up A.
@@ -121,6 +130,17 @@ int main()
     VectorXf x = L_T.colPivHouseholderQr().solve(y);
 
     cout << "x" << endl << x << endl;
+
+    cout << "x_pred" << endl << x_pred << endl;
+
+    // presam Error calculator
+    double pred_error = 0.0;
+    for(int i = 0; i < num_poses; i++)
+    {
+        pred_error += abs(x_pred(i) - gt(i));
+    }
+    pred_error = pred_error / (num_poses);
+    cout << "pred_error" << endl << pred_error << endl;
 
     // error calculator 
     double error = 0.0;

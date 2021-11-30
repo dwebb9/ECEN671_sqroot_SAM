@@ -1,5 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
+#include <random>
 #include <cmath>
  
 using namespace Eigen;
@@ -46,8 +47,15 @@ int main()
     MatrixXf pose_groundtruth(num_poses, 3);
     pose_groundtruth << 0,0,0, 2,1,0.4 ,5,4,0.7 ,8,4,0.8 ,9,4,0.5, 12,4,0.2, 16,4,0.1, 18,4,0.05, 19,5,0.3, 17,8,0.9, 15,8,1.5, 13,8,1.9, 11,6,2.8, 10,6,3.2, 9,6,3.9, 7,7,3.2, 6,9,2.5, 4,9,3.2, 3,9,3.1, 3,7,3.9, 3,4,4.7, 5,4,5.6, 8,4,6.1, 9,4,0, 12,4,0.1;
 
+
+    // set up random norman number generation
+    default_random_engine generator;
+    normal_distribution<double> noise(0.0, 1.0);
+    normal_distribution<double> angle_noise(0.0, 0.1);
+
     // randomly initialized as the value will change later
     VectorXf b(max_b_size);
+
 
     // temp vector that stores b values
     VectorXf temp_b(max_b_size);
@@ -68,8 +76,8 @@ int main()
 
         // update b matrix from ground truth. 
         temp_b(b_itt) = angle_of_movement - pose_groundtruth(i-1, 2);
-        temp_b(b_itt + 1) = distance;
-        temp_b(b_itt + 2) = pose_groundtruth(i,2) - angle_of_movement;
+        temp_b(b_itt + 1) = distance + noise(generator);
+        temp_b(b_itt + 2) = pose_groundtruth(i,2) - angle_of_movement + angle_noise(generator);
         b_itt = b_itt + 3;
 
         // update landmark measurements
@@ -81,8 +89,8 @@ int main()
             if(lm_dist < 3.0)
             {
                 double angle_of_observation = atan2(y_lm_dist, x_lm_dist);
-                temp_b(num_poses*3 + z_itt*2) = lm_dist;
-                temp_b(num_poses*3 + z_itt*2 + 1) =  angle_of_observation - pose_groundtruth(i,2);
+                temp_b(num_poses*3 + z_itt*2) = lm_dist + noise(generator);
+                temp_b(num_poses*3 + z_itt*2 + 1) =  angle_of_observation - pose_groundtruth(i,2) + angle_noise(generator);
                 landmark_reference(z_itt) = j;
                 pose_reference(z_itt) = i;
                 z_itt++;
@@ -90,7 +98,9 @@ int main()
         }
     }
 
-    int b_size = num_poses*3 + z_itt*2;
+    z_itt--;
+
+    int b_size = num_poses*3 + z_itt*2 + 3;
     b.resize(b_size);
 
     for(int i = 0; i < b_size; i++)
@@ -98,8 +108,7 @@ int main()
         b(i) = temp_b(i);
     }
 
-    // cout << "b:" << endl << b << endl;
-    // cout << "last OD: " << endl << b(num_poses*3 - 3) << endl << b(num_poses*3 - 2) << endl << b(num_poses*3 - 1) << endl;
+    // predition. 
 
     VectorXf thetaPred(25); 
     thetaPred(0) = 0;
@@ -110,10 +119,24 @@ int main()
         b_itt = b_itt + 3;
     }
 
+    int th_itt = 0;
+
+    VectorXf x_pred(num_poses*3);
+    b_itt = 3;
+    for(int i = 3; i < num_poses*3; i+= 3)
+    {
+        x_pred(i) = x_pred(i-3) + b(b_itt + 1)*cos(thetaPred(th_itt) + b(b_itt));
+        x_pred(i + 1) = x_pred(i-2) + b(b_itt + 1)*sin(thetaPred(th_itt) + b(b_itt));
+        x_pred(i + 2) = thetaPred(th_itt);
+        th_itt++;
+        b_itt = b_itt + 3;
+    }
+
+
     b_itt = 3; // reset b itterator to use in A matrix generation
 
     // next step is to generate A matrix
-    MatrixXf A(num_poses*3 + z_itt*2, num_poses*3 + num_landmarks*2);
+    MatrixXf A(num_poses*3 + z_itt*2 + 3, num_poses*3 + num_landmarks*2);
     A(0,0) = 1;
     A(1,1) = 1;
     A(2,2) = 1;
@@ -130,7 +153,7 @@ int main()
             Vector2f Sigma; 
             Sigma(0) = b(b_itt + 1)*cos(thetaPred(theta_itt) + b(b_itt)); // sigma x
             Sigma(1) = b(b_itt + 1)*sin(thetaPred(theta_itt) + b(b_itt)); // sigma y
-            int q = Sigma.transpose()*Sigma;
+            double q = Sigma.transpose()*Sigma;
             A(pose_itt + 3, pose_itt) = Sigma(1)/q;
             A(pose_itt + 3, pose_itt + 1) = -Sigma(0)/q;
             A(pose_itt + 3, pose_itt + 2) = -1;
@@ -156,17 +179,14 @@ int main()
         {
             // J observation 
             int p = 3*pose_reference(measure_itt); // needs updated
+            int p_theta = pose_reference(measure_itt);
             int lm = 2*landmark_reference(measure_itt) + num_poses*3; // needs updated
             int meas_row = num_poses*3 + 2*measure_itt + 3;
 
-            cout << "p: " << p << endl;
-            cout << "lm: " << lm << endl;
-            cout << "meas_row: " << lm << endl;
-
             Vector2f Sigma; 
-            Sigma(0) = b(meas_row)*cos(thetaPred(p) + b(meas_row + 1)); // sigma x
-            Sigma(1) = b(meas_row)*sin(thetaPred(p) + b(meas_row + 1)); // sigma y
-            int q = Sigma.transpose()*Sigma;
+            Sigma(0) = b(meas_row)*cos(thetaPred(p_theta) + b(meas_row + 1)); // sigma x
+            Sigma(1) = b(meas_row)*sin(thetaPred(p_theta) + b(meas_row + 1)); // sigma y
+            double q = Sigma.transpose()*Sigma;
 
             // z
             A(meas_row, p) = -sqrt(q)*Sigma(0)/q; // xt
@@ -185,28 +205,65 @@ int main()
         }
     }
     
-    cout << "A: " << endl << A << endl; 
+    // cout << "A: " << endl << A << endl; 
     // cout << "theta_itt: " << endl << theta_itt << endl;
-    // // Squareroot SAM
-    // MatrixXf I = A.transpose()*A;
+    // Squareroot SAM
+    MatrixXf I = A.transpose()*A;
 
-    // MatrixXf L( I.llt().matrixL() );
-    // MatrixXf L_T=L.adjoint();//conjugate transpose
+    // cout << "I" << endl << I << endl;
 
-    // // // solves least squares using above L*LT*x = AT*b from cholesky
-    // VectorXf y = L.colPivHouseholderQr().solve(A.transpose()*b);
-    // VectorXf x = L_T.colPivHouseholderQr().solve(y);
+    MatrixXf L( I.llt().matrixL() );
+    MatrixXf L_T=L.adjoint();//conjugate transpose
 
-    // cout << "x" << endl << x << endl;
+    // cout << "L" << endl << L << endl; 
+
+    // solves least squares using above L*LT*x = AT*b from cholesky
+    VectorXf y = L.colPivHouseholderQr().solve(A.transpose()*b);
+    VectorXf x = L_T.colPivHouseholderQr().solve(y);
+
+    cout << "x" << endl << x << endl;
+
+    // prediction error
+    double pred_error = 0.0;
+    int x_itt = 0;
+    for(int i = 0; i < num_poses; i++)
+    {
+        for(int j = 0; j < 3; j++)
+        {
+            pred_error += abs(x(x_itt) - pose_groundtruth(i,j));
+            x_itt++;
+        }
+    }
+    pred_error = pred_error / (num_poses*3);
+    cout << "pred_error: " << pred_error << endl;
 
     // error calculator 
-    // double error = 0.0;
-    // for(int i = 0; i < num_poses + num_landmarks; i++)
-    // {
-    //     error += abs(x(i) - gt(i));
-    // }
-    // error = error / (num_poses + num_landmarks);
-    // cout << "error" << endl << error << endl;
+    double error = 0.0;
+    VectorXf error_list(x.size());
+    x_itt = 0;
+    for(int i = 0; i < num_poses + num_landmarks; i++)
+    {
+        if(i< num_poses)
+        {
+            for(int j = 0; j < 3; j++)
+            {
+                error += abs(x(x_itt) - pose_groundtruth(i,j));
+                error_list(x_itt) = error;
+                x_itt++;
+            }
+        }
+        else
+        {
+            for(int j = 0; j < 2; j++)
+            {
+                error += abs(x(x_itt) - landmark_groundtruth(i-25,j));
+                x_itt++;
+            }
+        }
+    }
+    error = error / (num_poses*3 + num_landmarks*2);
+    // cout << "error list" << endl << error_list << endl;
+    cout << "error" << endl << error << endl;
 
     return 0;
 }
