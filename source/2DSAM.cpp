@@ -119,14 +119,14 @@ int main()
         b_itt = b_itt + 3;
     }
 
-    int th_itt = 0;
+    int th_itt = 1;
 
     VectorXf x_pred(num_poses*3);
     b_itt = 3;
     for(int i = 3; i < num_poses*3; i+= 3)
     {
-        x_pred(i) = x_pred(i-3) + b(b_itt + 1)*cos(thetaPred(th_itt) + b(b_itt));
-        x_pred(i + 1) = x_pred(i-2) + b(b_itt + 1)*sin(thetaPred(th_itt) + b(b_itt));
+        x_pred(i) = x_pred(i-3) + b(b_itt + 1)*cos(thetaPred(th_itt - 1) + b(b_itt));
+        x_pred(i + 1) = x_pred(i-2) + b(b_itt + 1)*sin(thetaPred(th_itt - 1) + b(b_itt));
         x_pred(i + 2) = thetaPred(th_itt);
         th_itt++;
         b_itt = b_itt + 3;
@@ -223,6 +223,7 @@ int main()
 
     cout << "x" << endl << x << endl;
 
+    cout << "x_pred" << endl << x_pred << endl;
     // prediction error
     double pred_error = 0.0;
     int x_itt = 0;
